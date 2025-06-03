@@ -1,15 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
 import { orderService } from "@/services/pocketbaseService";
-import { useRouter } from "next/navigation";
+// Eliminamos la importación de useRouter ya que usamos window.location
 import { ORDER_STATUS } from "@/config/pocketbase.config";
 import Link from "next/link";
 
 export default function CheckoutPage() {
-  const { items, getCartTotal, clearCart } = useCart();
+  const {
+    items,
+    justCompletedOrder,
+    getCartTotal,
+    clearCart,
+    resetOrderCompletion,
+  } = useCart();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -20,15 +26,29 @@ export default function CheckoutPage() {
     zipCode: "",
   });
   const { showToast } = useToast();
-  const router = useRouter();
-  // Redireccionar al carrito si está vacío
-  // Necesitamos usar useEffect para la redirección del lado del cliente
+  const hasRedirected = useRef(false);
+  const hasResetCompletionRef = useRef(false);
+
+  // Manejo de carrito vacío y reseteo de bandera de orden
   useEffect(() => {
-    if (items.length === 0) {
-      router.push("/carrito");
+    // Si acabamos de completar una orden y no hemos resetado la bandera
+    if (justCompletedOrder && !hasResetCompletionRef.current) {
+      hasResetCompletionRef.current = true;
+      // Usamos setTimeout para evitar actualizaciones de estado anidadas
+      setTimeout(() => {
+        resetOrderCompletion();
+      }, 0);
+      return;
+    }
+
+    // Si el carrito está vacío (pero no por completar una orden) y no hemos redirigido
+    if (items.length === 0 && !justCompletedOrder && !hasRedirected.current) {
+      hasRedirected.current = true;
+      // Usamos window.location para evitar problemas con router que pueden causar bucles
+      window.location.href = "/catalogo";
       showToast("El carrito está vacío", "info");
     }
-  }, [items.length, router, showToast]);
+  }, [items.length, justCompletedOrder, resetOrderCompletion, showToast]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -37,13 +57,25 @@ export default function CheckoutPage() {
       [name]: value,
     }));
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevenir envíos duplicados
+    if (loading) return;
+
     setLoading(true);
 
     try {
+      // Solo procesar si hay items
+      if (items.length === 0) {
+        showToast("El carrito está vacío", "error");
+        window.location.href = "/catalogo";
+        return;
+      }
+
       const orderData = {
+        collectionId: "pbc_3527180448",
+        collectionName: "orders",
         customerName: formData.name,
         customerEmail: formData.email,
         customerPhone: formData.phone,
@@ -52,7 +84,7 @@ export default function CheckoutPage() {
           id: String(item.id),
         })),
         totalAmount: getCartTotal(),
-        status: ORDER_STATUS.PENDING,
+        status: ORDER_STATUS.PROCESSING, // Usamos "processing" según el modelo solicitado
         shippingAddress: {
           name: formData.name,
           address: formData.address,
@@ -61,20 +93,16 @@ export default function CheckoutPage() {
           phone: formData.phone,
         },
         createdAt: new Date().toISOString(),
-      };
-
-      const newOrder = await orderService.createOrder(orderData);
+      }; // Usar directamente el servicio
+      await orderService.createOrder(orderData);
 
       // Limpiar carrito después de crear el pedido
       clearCart();
 
       showToast("¡Pedido realizado con éxito!", "success");
 
-      // Mostrar mensaje de confirmación
-      alert(`¡Gracias por tu compra! Tu número de pedido es: ${newOrder.id}`);
-
-      // Redireccionar a la página principal
-      router.push("/");
+      // Usamos window.location.href para un enfoque más directo que evite ciclos
+      window.location.href = "/";
     } catch (error) {
       console.error("Error al crear el pedido:", error);
       showToast("Error al procesar el pedido. Intente nuevamente.", "error");

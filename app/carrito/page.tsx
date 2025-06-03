@@ -1,13 +1,31 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/context/ToastContext";
 import Link from "next/link";
 
 export default function CarritoPage() {
-  const { items, removeFromCart, updateQuantity, clearCart, getCartTotal } =
-    useCart();
+  const {
+    items,
+    justCompletedOrder,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    getCartTotal,
+    resetOrderCompletion,
+  } = useCart();
   const { showToast } = useToast();
+  // Si acabamos de completar una orden, resetear la bandera
+  // Pero usamos una ref para asegurarnos de que esto se ejecute solo una vez
+  const hasResetCompletionRef = useRef(false);
+
+  useEffect(() => {
+    if (justCompletedOrder && !hasResetCompletionRef.current) {
+      hasResetCompletionRef.current = true;
+      resetOrderCompletion();
+    }
+  }, [justCompletedOrder, resetOrderCompletion]);
 
   // Si el carrito está vacío
   if (items.length === 0) {
@@ -132,21 +150,16 @@ export default function CarritoPage() {
         </button>
 
         <div className="bg-gray-100 p-4 rounded">
+          {" "}
           <div className="flex justify-between mb-2">
             <span className="font-semibold">Total:</span>
             <span className="font-bold">${getCartTotal().toFixed(2)}</span>
           </div>
-          <button
-            onClick={() =>
-              showToast(
-                "¡Gracias por tu compra! Este es un ejemplo, no hay procesamiento de pagos real.",
-                "success"
-              )
-            }
-            className="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors"
-          >
-            Proceder al pago
-          </button>
+          <Link href="/checkout">
+            <button className="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors">
+              Proceder al pago
+            </button>
+          </Link>
         </div>
       </div>
     </div>
