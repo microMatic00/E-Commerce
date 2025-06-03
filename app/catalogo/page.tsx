@@ -1,5 +1,5 @@
-import CatalogPlaceholder from '@/components/CatalogPlaceholder';
+import ProductCatalog from "@/components/ProductCatalog";
 
 export default function CatalogoPage() {
-  return <CatalogPlaceholder />;
+  return <ProductCatalog />;
 }

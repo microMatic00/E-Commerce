@@ -10,10 +10,13 @@ import {
 
 // Definir el tipo de producto y item del carrito
 export interface Product {
-  id: number;
+  id: string;
   name: string;
   description: string;
   price: number;
+  stock?: number;
+  image?: string;
+  category?: string;
 }
 
 export interface CartItem extends Product {
@@ -24,12 +27,12 @@ export interface CartItem extends Product {
 interface CartContextType {
   items: CartItem[];
   addToCart: (product: Product) => void;
-  removeFromCart: (productId: number) => void;
-  updateQuantity: (productId: number, quantity: number) => void;
+  removeFromCart: (productId: string) => void;
+  updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   getCartTotal: () => number;
   getItemCount: () => number;
-  getProductQuantity: (productId: number) => number;
+  getProductQuantity: (productId: string) => number;
 }
 
 // Crear el contexto
@@ -68,10 +71,10 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     setItems(loadCartFromStorage());
   }, []);
-
   // Guardar en localStorage cuando cambie items
   useEffect(() => {
-    if (items.length > 0 || localStorage.getItem("cart") !== null) {
+    // Solo guardar si estamos en el navegador
+    if (typeof window !== "undefined") {
       localStorage.setItem("cart", JSON.stringify(items));
     }
   }, [items]);
@@ -97,14 +100,13 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         return [...prevItems, { ...product, quantity: 1 }];
       }
     });
-  };
-  // Eliminar producto del carrito
-  const removeFromCart = (productId: number) => {
+  }; // Eliminar producto del carrito
+  const removeFromCart = (productId: string) => {
     setItems((prevItems) => prevItems.filter((item) => item.id !== productId));
   };
 
   // Actualizar cantidad de un producto
-  const updateQuantity = (productId: number, quantity: number) => {
+  const updateQuantity = (productId: string, quantity: number) => {
     if (quantity <= 0) {
       // Si la cantidad es 0 o menos, eliminar el producto
       removeFromCart(productId);
@@ -133,9 +135,8 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
   const getItemCount = () => {
     return items.reduce((total, item) => total + item.quantity, 0);
   };
-
   // Obtener cantidad de un producto específico
-  const getProductQuantity = (productId: number) => {
+  const getProductQuantity = (productId: string) => {
     const item = items.find((item) => item.id === productId);
     return item ? item.quantity : 0;
   };
