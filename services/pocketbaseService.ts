@@ -32,6 +32,7 @@ export const productService = {
     filter?: string;
     page?: number;
     perPage?: number;
+    signal?: AbortSignal; // Añadimos soporte para AbortSignal
   }) => {
     try {
       console.log("Llamando a PocketBase para obtener productos...");
@@ -40,8 +41,10 @@ export const productService = {
       console.log("Opciones de búsqueda:", options);
 
       const page = options?.page || 1;
-      const perPage = options?.perPage || 50;
-      const queryOptions: Record<string, string | number | boolean> = {
+      const perPage = options?.perPage || 50; // Creamos las opciones de consulta
+      /*// @ts-expect-erro - Necesitamos un tipo amplio para soportar PocketBase*/
+
+      const queryOptions: Record<string, unknown> = {
         sort: options?.sort || "created",
       };
 
@@ -49,6 +52,18 @@ export const productService = {
         queryOptions.filter = options.filter;
       }
 
+      // Desactivamos la auto-cancelación por defecto
+      // Esto resuelve el problema "ClientResponseError 0: The request was autocancelled"
+      queryOptions.requestKey = false;
+
+      // Si se proporciona una señal de abort, la pasamos a la solicitud
+      if (options?.signal) {
+        queryOptions.signal = options.signal;
+      } // Forma alternativa para evitar autocancelación:
+      // 1. Configuramos explícitamente sin autocancelación
+      pb.autoCancellation(false);
+
+      // 2. Hacemos la llamada
       const result = await pb
         .collection(COLLECTIONS.PRODUCTS)
         .getList<Product>(page, perPage, queryOptions);
@@ -56,7 +71,10 @@ export const productService = {
       console.log("Respuesta de PocketBase:", result);
       return result;
     } catch (error) {
-      console.error("Error en productService.getAll:", error);
+      // No registramos errores si la solicitud fue cancelada intencionalmente
+      if (!(error instanceof Error && error.name === "AbortError")) {
+        console.error("Error en productService.getAll:", error);
+      }
       throw error;
     }
   },

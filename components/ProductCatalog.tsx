@@ -15,8 +15,11 @@ export default function ProductCatalog() {
   const [categories, setCategories] = useState<string[]>([]);
   const { addToCart, getProductQuantity } = useCart();
   const { showToast } = useToast();
-
   useEffect(() => {
+    // Crear un AbortController para cada solicitud
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+
     const fetchProducts = async () => {
       try {
         setLoading(true);
@@ -50,10 +53,11 @@ export default function ProductCatalog() {
             : categoryCondition;
         }
 
-        // Realizar la consulta a PocketBase con las opciones
+        // Realizar la consulta a PocketBase con las opciones y el AbortSignal
         const result = await productService.getAll({
           sort,
           filter: filter || undefined,
+          signal, // Pasar la señal de abort
         });
         // Mapea la respuesta de PocketBase al formato de Product
         const productList = result.items.map((item) => ({
@@ -80,19 +84,31 @@ export default function ProductCatalog() {
           ];
           setCategories(uniqueCategories);
         }
-
         setError(null);
       } catch (err) {
-        console.error("Error al cargar productos:", err);
-        setError(
-          "Error al cargar los productos. Inténtalo de nuevo más tarde."
-        );
+        // No mostrar error si la solicitud fue cancelada intencionalmente
+        if (err instanceof Error && err.name !== "AbortError") {
+          console.error("Error al cargar productos:", err);
+          setError(
+            "Error al cargar los productos. Inténtalo de nuevo más tarde."
+          );
+        }
       } finally {
-        setLoading(false);
+        // Solo cambiar el estado de carga si no se ha cancelado la solicitud
+        if (!signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchProducts();
+
+    // Función de limpieza para cancelar solicitudes pendientes cuando el componente se desmonta
+    // o cuando cambian las dependencias
+    return () => {
+      console.log("Cancelando solicitud de productos pendiente");
+      abortController.abort();
+    };
   }, [sortOption, searchTerm, categoryFilter]);
 
   const handleAddToCart = (product: Product) => {
