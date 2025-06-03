@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { orderService, Order } from "@/services/pocketbaseService";
+import { orderService, Order, CartItem } from "@/services/pocketbaseService";
 import { useToast } from "@/context/ToastContext";
 import Link from "next/link";
 
@@ -11,7 +11,6 @@ export default function PedidosPage() {
   const [email, setEmail] = useState("");
   const [searchSubmitted, setSearchSubmitted] = useState(false);
   const { showToast } = useToast();
-
   const searchOrdersByEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setSearchSubmitted(true);
@@ -19,9 +18,9 @@ export default function PedidosPage() {
 
     try {
       if (email) {
-        const result = await orderService.getOrdersByEmail(email);
-        setOrders(result);
-        if (result.length === 0) {
+        const result = await orderService.getOrdersByCustomer(email);
+        setOrders(result.items);
+        if (result.items.length === 0) {
           showToast(
             "No se encontraron pedidos para este correo electrónico",
             "info"
@@ -167,33 +166,64 @@ export default function PedidosPage() {
                     </div>
 
                     <div className="p-4">
-                      <h3 className="font-semibold mb-2">Productos:</h3>
+                      <h3 className="font-semibold mb-2">Productos:</h3>{" "}
                       <ul className="space-y-2">
-                        {order.items.map((item, idx) => (
-                          <li key={idx} className="flex justify-between">
-                            <span>
-                              {item.quantity}x {item.name}
-                            </span>
-                            <span className="text-gray-600">
-                              ${(item.price * item.quantity).toFixed(2)}
-                            </span>
-                          </li>
-                        ))}
+                        {typeof order.items === "string"
+                          ? JSON.parse(order.items).map(
+                              (item: CartItem, idx: number) => (
+                                <li key={idx} className="flex justify-between">
+                                  <span>
+                                    {item.quantity}x {item.name}
+                                  </span>
+                                  <span className="text-gray-600">
+                                    ${(item.price * item.quantity).toFixed(2)}
+                                  </span>
+                                </li>
+                              )
+                            )
+                          : order.items.map((item, idx) => (
+                              <li key={idx} className="flex justify-between">
+                                <span>
+                                  {item.quantity}x {item.name}
+                                </span>
+                                <span className="text-gray-600">
+                                  ${(item.price * item.quantity).toFixed(2)}
+                                </span>
+                              </li>
+                            ))}
                       </ul>
-
                       <div className="mt-4 pt-4 border-t border-gray-200">
                         <h3 className="font-semibold mb-2">
                           Dirección de envío:
                         </h3>
-                        <p>{order.shippingAddress.name}</p>
-                        <p>{order.shippingAddress.address}</p>
-                        <p>
-                          {order.shippingAddress.city},{" "}
-                          {order.shippingAddress.zipCode}
-                        </p>
-                        <p>Tel: {order.shippingAddress.phone}</p>
+                        {typeof order.shippingAddress === "string" ? (
+                          (() => {
+                            const address = JSON.parse(
+                              order.shippingAddress as string
+                            );
+                            return (
+                              <>
+                                <p>{address.name}</p>
+                                <p>{address.address}</p>
+                                <p>
+                                  {address.city}, {address.zipCode}
+                                </p>
+                                <p>Tel: {address.phone}</p>
+                              </>
+                            );
+                          })()
+                        ) : (
+                          <>
+                            <p>{order.shippingAddress.name}</p>
+                            <p>{order.shippingAddress.address}</p>
+                            <p>
+                              {order.shippingAddress.city},{" "}
+                              {order.shippingAddress.zipCode}
+                            </p>
+                            <p>Tel: {order.shippingAddress.phone}</p>
+                          </>
+                        )}
                       </div>
-
                       <div className="mt-4 pt-4 border-t border-gray-200">
                         <h3 className="font-semibold mb-2">
                           Información de contacto:

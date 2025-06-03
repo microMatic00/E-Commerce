@@ -26,10 +26,12 @@ export interface CartItem extends Product {
 // Definir el tipo del contexto
 interface CartContextType {
   items: CartItem[];
+  justCompletedOrder: boolean;
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
+  resetOrderCompletion: () => void;
   getCartTotal: () => number;
   getItemCount: () => number;
   getProductQuantity: (productId: string) => number;
@@ -66,6 +68,7 @@ const loadCartFromStorage = (): CartItem[] => {
 // Proveedor de contexto
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [justCompletedOrder, setJustCompletedOrder] = useState<boolean>(false);
 
   // Cargar carrito al inicio
   useEffect(() => {
@@ -118,12 +121,28 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         item.id === productId ? { ...item, quantity } : item
       )
     );
+  }; // Vaciar carrito
+  const clearCart = () => {
+    // Para evitar actualizaciones de estado múltiples que puedan causar bucles,
+    // usamos una sola actualización de estado
+    setItems([]);
+
+    // Marcamos que acabamos de completar una orden
+    // Esta operación se hace por separado para evitar actualizaciones anidadas
+    setTimeout(() => {
+      setJustCompletedOrder(true);
+    }, 0);
+
+    localStorage.removeItem("cart");
   };
 
-  // Vaciar carrito
-  const clearCart = () => {
-    setItems([]);
-    localStorage.removeItem("cart");
+  // Restablecer la marca de compra completada
+  const resetOrderCompletion = () => {
+    // Usamos setTimeout para garantizar que esta actualización
+    // de estado no cause un bucle con otras actualizaciones
+    setTimeout(() => {
+      setJustCompletedOrder(false);
+    }, 0);
   };
 
   // Obtener total del carrito
@@ -140,13 +159,14 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const item = items.find((item) => item.id === productId);
     return item ? item.quantity : 0;
   };
-
   const value = {
     items,
+    justCompletedOrder,
     addToCart,
     removeFromCart,
     updateQuantity,
     clearCart,
+    resetOrderCompletion,
     getCartTotal,
     getItemCount,
     getProductQuantity,

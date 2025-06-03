@@ -83,35 +83,122 @@ export const productService = {
 
 export interface Order {
   id?: string;
+  collectionId?: string;
+  collectionName?: string;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
-  items: CartItem[];
+  items: CartItem[] | string; // Puede ser un objeto o string JSON cuando se guarda/recupera
   totalAmount: number;
   status: string;
-  shippingAddress: {
-    name: string;
-    address: string;
-    city: string;
-    zipCode: string;
-    phone: string;
-  };
+  shippingAddress:
+    | {
+        name: string;
+        address: string;
+        city: string;
+        zipCode: string;
+        phone: string;
+      }
+    | string; // Puede ser un objeto o string JSON cuando se guarda/recupera
   createdAt: string;
 }
 
+// Servicio para gestionar órdenes
 export const orderService = {
+  // Crear una nueva orden
   createOrder: async (orderData: Omit<Order, "id">) => {
-    return await pb.collection(COLLECTIONS.ORDERS).create<Order>(orderData);
+    try {
+      console.log("Creando nueva orden en PocketBase...");
+      console.log("Datos de la orden:", orderData);
+
+      // Convertir arrays y objetos a formato JSON string para PocketBase
+      const preparedOrderData = {
+        customerName: orderData.customerName,
+        customerEmail: orderData.customerEmail,
+        customerPhone: orderData.customerPhone,
+        items: JSON.stringify(orderData.items),
+        totalAmount: orderData.totalAmount,
+        status: orderData.status || "processing", // Por defecto "processing" según modelo solicitado
+        shippingAddress: JSON.stringify(orderData.shippingAddress),
+        createdAt: orderData.createdAt || new Date().toISOString(),
+        // Los campos collectionId y collectionName son manejados internamente por PocketBase
+      };
+
+      const result = await pb
+        .collection(COLLECTIONS.ORDERS)
+        .create<Order>(preparedOrderData);
+
+      console.log("Orden creada con éxito:", result);
+      return result;
+    } catch (error) {
+      console.error("Error al crear la orden:", error);
+      throw error;
+    }
   },
 
-  getOrdersByEmail: async (email: string) => {
-    const result = await pb
-      .collection(COLLECTIONS.ORDERS)
-      .getList<Order>(1, 50, {
-        filter: `customerEmail = "${email}"`,
-        sort: "-created",
-      });
-    return result.items;
+  // Obtener todas las órdenes (útil para panel de administración)
+  getAllOrders: async () => {
+    try {
+      const records = await pb
+        .collection(COLLECTIONS.ORDERS)
+        .getList<Order>(1, 100, { sort: "-created" });
+      return records;
+    } catch (error) {
+      console.error("Error al obtener órdenes:", error);
+      throw error;
+    }
+  },
+
+  // Obtener órdenes de un cliente específico por email
+  getOrdersByCustomer: async (email: string) => {
+    try {
+      const records = await pb
+        .collection(COLLECTIONS.ORDERS)
+        .getList<Order>(1, 50, {
+          filter: `customerEmail = "${email}"`,
+          sort: "-created",
+        });
+      return records;
+    } catch (error) {
+      console.error("Error al obtener órdenes del cliente:", error);
+      throw error;
+    }
+  },
+
+  // Obtener una orden específica por ID
+  getOrderById: async (id: string) => {
+    try {
+      const record = await pb.collection(COLLECTIONS.ORDERS).getOne<Order>(id);
+
+      // Convertir de vuelta los campos JSON string a objetos JavaScript
+      return {
+        ...record,
+        items:
+          typeof record.items === "string"
+            ? JSON.parse(record.items)
+            : record.items,
+        shippingAddress:
+          typeof record.shippingAddress === "string"
+            ? JSON.parse(record.shippingAddress)
+            : record.shippingAddress,
+      };
+    } catch (error) {
+      console.error("Error al obtener orden por ID:", error);
+      throw error;
+    }
+  },
+
+  // Actualizar el estado de una orden
+  updateOrderStatus: async (id: string, status: string) => {
+    try {
+      const record = await pb
+        .collection(COLLECTIONS.ORDERS)
+        .update<Order>(id, { status });
+      return record;
+    } catch (error) {
+      console.error("Error al actualizar estado de la orden:", error);
+      throw error;
+    }
   },
 };
 
