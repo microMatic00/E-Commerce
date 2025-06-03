@@ -47,7 +47,25 @@ export default function CarritoPage() {
               <tr key={item.id} className="border-b">
                 <td className="py-4">
                   <div className="flex items-center">
-                    <div className="w-16 h-16 flex-shrink-0 bg-gray-200 rounded"></div>
+                    {item.image ? (
+                      <img
+                        src={`${
+                          process.env.NEXT_PUBLIC_POCKETBASE_URL ||
+                          "http://127.0.0.1:8090"
+                        }/api/files/products/${item.id}/${item.image}`}
+                        alt={item.name}
+                        className="w-16 h-16 flex-shrink-0 object-cover rounded"
+                        onError={(e) => {
+                          // Si hay un error al cargar la imagen, mostrar un espacio en gris
+                          e.currentTarget.style.display = "none";
+                          e.currentTarget.parentElement?.classList.add(
+                            "bg-gray-200"
+                          );
+                        }}
+                      />
+                    ) : (
+                      <div className="w-16 h-16 flex-shrink-0 bg-gray-200 rounded"></div>
+                    )}
                     <div className="ml-4">
                       <h3 className="text-lg font-semibold">{item.name}</h3>
                       <p className="text-gray-600">{item.description}</p>
